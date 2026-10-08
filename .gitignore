@@ -1,0 +1,18 @@
+node_modules/
+.env
+sessions/
+data/
+downloads/
+*.log
+bot.lock
+bot-sup.pid
+.update-state.json
+.update.lock
+.update-backup/
+.komik-cache.json
+# data runtime
+react.json
+gc.json
+autoreply.json
+watch.json
+publicmode.json
