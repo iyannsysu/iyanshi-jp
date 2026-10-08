@@ -445,6 +445,18 @@ export default async function ({ message, type: messagesType }, hisoka) {
 				try { await m.reply('❌ Terjadi kesalahan saat menjalankan command.'); } catch {}
 			}
 		}
+
+		// ===== ADAWONG AUTO-MODE =====
+		// Kalau aktif di chat ini, pesan biasa owner (bukan command) langsung dibalas adawong.
+		// Loop aman: balasan bot diawali prefix ADAWONG_PREFIX sehingga tidak masuk antrean lagi.
+		try {
+			if (!m.command && m.isOwner && m.text && !m.text.trim().startsWith('💬 *adawong:*')) {
+				const adw = await import('../plugins/adawong.js');
+				if (adw.isAutoChat(m.from)) {
+					await adw.handleAutoMessage(hisoka, m);
+				}
+			}
+		} catch {}
 		// =============================
 	} catch (error) {
 		console.error(`\x1b[31mError in message handler:\x1b[39m\n`, error);
