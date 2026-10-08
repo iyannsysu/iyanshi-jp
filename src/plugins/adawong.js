@@ -77,6 +77,47 @@ async function sendLikeHuman(to, text) {
 	}
 }
 
+/** Kirim media (foto) — download dari Pollinations bila worker hanya memberi prompt. */
+async function sendMediaLikeHuman(to, reply) {
+	let filePath = reply.media && reply.media.path;
+	const mediaPrompt = reply.media_prompt;
+
+	// Worker hanya menulis prompt -> bot yang download gambarnya
+	if (!filePath && mediaPrompt) {
+		const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'adwimg-'));
+		filePath = path.join(tmpDir, 'img.jpg');
+		try {
+			const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(mediaPrompt)}?width=768&height=768&nologo=true&model=flux`;
+			const res = await fetch(url, { signal: AbortSignal.timeout(120000) });
+			if (!res.ok) throw new Error('HTTP ' + res.status);
+			const buf = Buffer.from(await res.arrayBuffer());
+			if (buf.length < 10000) throw new Error('gambar tidak valid');
+			fs.writeFileSync(filePath, buf);
+		} catch (err) {
+			fs.rmSync(tmpDir, { recursive: true, force: true });
+			// fallback: kirim teks saja
+			await sendLikeHuman(to, `🎨 Maaf sayang, gambarnya gagal dibuat (${err?.message || 'error'}).`);
+			return;
+		}
+	}
+
+	if (!filePath || !fs.existsSync(filePath)) return;
+	const caption = (reply.media && reply.media.caption) || '';
+	try {
+		await sock.sendPresenceUpdate('composing', to);
+	} catch {}
+	await sleep(2500); // jeda "menyiapkan" media
+	try {
+		await sock.sendMessage(to, {
+			image: fs.readFileSync(filePath),
+			caption,
+		});
+	} finally {
+		try { await sock.sendPresenceUpdate('paused', to); } catch {}
+		try { fs.unlinkSync(filePath); } catch {}
+	}
+}
+
 /** Kirim balasan yang sudah siap ke chat masing-masing. */
 async function deliverReplies() {
 	if (!sock) return;
@@ -85,7 +126,12 @@ async function deliverReplies() {
 	const remaining = [];
 	for (const r of replies) {
 		try {
-			await sendLikeHuman(r.to, `💬 *adawong:*\n${r.text}`);
+			if (r.media_prompt || (r.media && r.media.path)) {
+				await sendMediaLikeHuman(r.to, r);
+			}
+			if (r.text) {
+				await sendLikeHuman(r.to, `💬 *adawong:*\n${r.text}`);
+			}
 		} catch {
 			remaining.push(r); // gagal -> coba lagi nanti
 		}
@@ -148,8 +194,7 @@ export default {
 		});
 		// simpan max 50 entri terakhir
 		writeJsonAtomic(QUEUE_FILE, queue.slice(-50));
-		// langsung tampilkan "mengetik..." biar berasa hidup
+		// langsung tampilkan "mengetik..." saja, tanpa teks "tunggu dulu"
 		try { await hisoka.sendPresenceUpdate('composing', m.from); } catch {}
-		await m.reply('⏳ Oke, kumikir dulu ya sayang...');
 	},
 };
