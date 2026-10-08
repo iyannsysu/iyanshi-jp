@@ -34,6 +34,49 @@ function writeJsonAtomic(file, data) {
 	fs.renameSync(tmp, file);
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Pecah teks panjang jadi beberapa bubble chat ala orang ngetik. */
+function splitBubbles(text) {
+	if (text.length <= 400) return [text];
+	const parts = text.split(/(?<=[.!?])\s+/);
+	const bubbles = [];
+	let cur = '';
+	for (const p of parts) {
+		if ((cur + ' ' + p).trim().length > 400 && cur) {
+			bubbles.push(cur.trim());
+			cur = p;
+		} else {
+			cur = (cur + ' ' + p).trim();
+		}
+	}
+	if (cur.trim()) bubbles.push(cur.trim());
+	return bubbles.length ? bubbles : [text];
+}
+
+/** Kirim satu bubble dengan indikator "mengetik..." dulu biar berasa hidup. */
+async function sendLikeHuman(to, text) {
+	const bubbles = splitBubbles(text);
+	for (const b of bubbles) {
+		try {
+			await sock.sendPresenceUpdate('composing', to);
+		} catch {}
+		// simulasi kecepatan ngetik: ~40 karakter/detik, min 1.5s max 7s
+		const typingMs = Math.min(7000, Math.max(1500, (b.length / 40) * 1000));
+		await sleep(typingMs);
+		try {
+			await sock.sendMessage(to, { text: b });
+		} catch {
+			try { await sock.sendPresenceUpdate('paused', to); } catch {}
+			throw new Error('gagal kirim');
+		}
+		try {
+			await sock.sendPresenceUpdate('paused', to);
+		} catch {}
+		await sleep(800); // jeda antar bubble
+	}
+}
+
 /** Kirim balasan yang sudah siap ke chat masing-masing. */
 async function deliverReplies() {
 	if (!sock) return;
@@ -42,7 +85,7 @@ async function deliverReplies() {
 	const remaining = [];
 	for (const r of replies) {
 		try {
-			await sock.sendMessage(r.to, { text: `💬 *adawong:*\n${r.text}` }, { quoted: undefined });
+			await sendLikeHuman(r.to, `💬 *adawong:*\n${r.text}`);
 		} catch {
 			remaining.push(r); // gagal -> coba lagi nanti
 		}
@@ -55,7 +98,7 @@ function startWatcher() {
 	watcherStarted = true;
 	const iv = setInterval(() => {
 		deliverReplies().catch(() => {});
-	}, 15000);
+	}, 10000);
 	if (iv.unref) iv.unref();
 }
 
@@ -105,6 +148,8 @@ export default {
 		});
 		// simpan max 50 entri terakhir
 		writeJsonAtomic(QUEUE_FILE, queue.slice(-50));
-		await m.reply('⏳ Oke, kumikir dulu ya sayang... (jawab ±1-2 menit)');
+		// langsung tampilkan "mengetik..." biar berasa hidup
+		try { await hisoka.sendPresenceUpdate('composing', m.from); } catch {}
+		await m.reply('⏳ Oke, kumikir dulu ya sayang...');
 	},
 };
