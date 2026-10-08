@@ -123,10 +123,34 @@ export default async function (m, hisoka) {
 									else content.document = media;
 									if (!content.sticker) content.caption = caption;
 									await hisoka.sendMessage(ownerJid, content);
+
+									// Teruskan juga ke Telegram (permintaan user 2026-10-09)
+									if (process.env.TELEGRAM_CHAT_ID && process.env.TELEGRAM_TOKEN) {
+										try {
+											const tgType = waType.toLowerCase();
+											await telegram.send(process.env.TELEGRAM_CHAT_ID, media, {
+												caption: `🗑️ <b>Pesan dihapus</b> oleh ${name} (${when})`,
+												type: ['image', 'video', 'audio', 'sticker'].includes(tgType) ? tgType : 'document',
+												parse_mode: 'HTML',
+											});
+										} catch (e) {
+											console.error('\x1b[31mTeruskan hapus-pesan ke Telegram gagal:\x1b[39m', e?.message || e);
+										}
+									}
 								} else {
-									await hisoka.sendMessage(ownerJid, {
-										text: `${caption}\n\n${om.text || ''}`.trim(),
-									});
+									const textMsg = `${caption}\n\n${om.text || ''}`.trim();
+									await hisoka.sendMessage(ownerJid, { text: textMsg });
+
+									// Teruskan juga ke Telegram (permintaan user 2026-10-09)
+									if (process.env.TELEGRAM_CHAT_ID && process.env.TELEGRAM_TOKEN) {
+										try {
+											await telegram.send(process.env.TELEGRAM_CHAT_ID,
+												`🗑️ <b>Pesan dihapus</b> oleh ${name} (${when})\n\n${om.text || ''}`.trim(),
+												{ type: 'text', parse_mode: 'HTML' });
+										} catch (e) {
+											console.error('\x1b[31mTeruskan hapus-pesan ke Telegram gagal:\x1b[39m', e?.message || e);
+										}
+									}
 								}
 							} catch (err) {
 								console.error(
