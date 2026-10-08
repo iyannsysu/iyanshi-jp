@@ -3,6 +3,7 @@
 // Kategori: other
 
 import * as shared from './_shared.js';
+import { injectMessage } from '../helper/inject.js';
 
 	const {
 		isJidGroup, jidNormalizedUser, jidDecode, generateWAMessageFromContent,

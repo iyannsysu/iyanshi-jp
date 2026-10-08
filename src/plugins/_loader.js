@@ -7,21 +7,23 @@ import fs from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
 
-// Registry hasil load terakhir. Dipakai plugin lain (mis. menu) supaya daftar
+// Registry hasil load terakhir. Dipakai plugin lain (mis. menu, fitur) supaya daftar
 // command selalu sesuai plugin yang benar-benar termuat — tanpa daftar manual.
-let registry = { map: new Map(), list: [] };
+// `failed`: plugin yang GAGAL load (dipakai .fitur untuk tanda ✗).
+let registry = { map: new Map(), list: [], failed: [] };
 
-/** @returns {{map: Map<string, object>, list: object[]}} hasil loadPlugins terakhir */
+/** @returns {{map: Map<string, object>, list: object[], failed: object[]}} hasil loadPlugins terakhir */
 export function getPluginRegistry() {
 	return registry;
 }
 
 /**
- * @returns {Promise<{map: Map<string, object>, list: object[]}>}
+ * @returns {Promise<{map: Map<string, object>, list: object[], failed: object[]}>}
  */
 export async function loadPlugins(pluginsDir) {
 	const map = new Map();
 	const list = [];
+	const failed = [];
 	let files = [];
 	try {
 		files = fs.readdirSync(pluginsDir).filter(f => f.endsWith('.js') && !f.startsWith('_'));
@@ -35,6 +37,7 @@ export async function loadPlugins(pluginsDir) {
 			const p = mod.default;
 			if (!p || typeof p.name !== 'string' || typeof p.run !== 'function') {
 				console.warn(`\x1b[33m[plugin] skip ${f}: format tidak valid (butuh { name, run })\x1b[39m`);
+				failed.push({ file: f, name: f.replace(/\.js$/, ''), reason: 'format tidak valid' });
 				continue;
 			}
 			p.aliases = Array.isArray(p.aliases) ? p.aliases : [];
@@ -52,8 +55,9 @@ export async function loadPlugins(pluginsDir) {
 			}
 		} catch (e) {
 			console.error(`\x1b[31m[plugin] gagal load ${f}:\x1b[39m`, e?.message || e);
+			failed.push({ file: f, name: f.replace(/\.js$/, ''), reason: String(e?.message || e).slice(0, 120) });
 		}
 	}
-	registry = { map, list };
-	return { map, list };
+	registry = { map, list, failed };
+	return { map, list, failed };
 }
