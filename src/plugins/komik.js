@@ -100,30 +100,30 @@ async function readChapter(ctx, idx) {
 		return;
 	}
 	await m.reply(`📄 ${images.length} halaman, mengunduh...`);
-	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kmk-'));
-	try {
-		const files = [];
+	{
+		const bufs = [];
 		for (let i = 0; i < images.length; i++) {
 			try {
 				const buf = await downloadKomikImage(images[i]);
-				const fp = path.join(tmpDir, `p${String(i).padStart(3, '0')}.jpg`);
-				fs.writeFileSync(fp, buf);
-				files.push(fp);
+				bufs.push(buf);
 			} catch {}
 			if ((i + 1) % 10 === 0) await m.reply(`⏳ ${i + 1}/${images.length}...`);
 		}
-		if (!files.length) {
+		if (!bufs.length) {
 			await m.reply('❌ Semua halaman gagal diunduh.');
 			return;
 		}
-		// Kirim per album (maks 20 gambar per album)
-		for (let i = 0; i < files.length; i += PER_ALBUM) {
-			const chunk = files.slice(i, i + PER_ALBUM);
-			await sendAlbum(hisoka, m.from, chunk);
-		}
-		await m.reply(`✅ Selesai: *${cached.title}* — ${ch.label} (${files.length} hlm)`);
-	} finally {
-		fs.rmSync(tmpDir, { recursive: true, force: true });
+		// Jadikan SATU PDF biar nggak spam banyak pesan gambar.
+		await m.reply('📕 Menyusun PDF...');
+		const { imagesToPdf, safePdfName } = await import('../helper/comicpdf.js');
+		const pdf = await imagesToPdf(bufs, { title: `${cached.title} — ${ch.label}` });
+		await hisoka.sendMessage(m.from, {
+			document: pdf,
+			mimetype: 'application/pdf',
+			fileName: safePdfName(`${cached.title} ${ch.label}`),
+			caption: `📕 *${cached.title}* — ${ch.label} (${bufs.length} hlm)`,
+		}, { quoted: m });
+		await m.reply(`✅ Selesai: *${cached.title}* — ${ch.label} (${bufs.length} hlm)`);
 	}
 }
 

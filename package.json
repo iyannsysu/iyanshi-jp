@@ -21,6 +21,7 @@
     "baileys": "npm:@whiskeysockets/baileys@7.0.0-rc14",
     "dotenv": "^17.2.3",
     "https-proxy-agent": "^9.1.0",
+    "pdfkit": "^0.20.2",
     "pino": "^9.6.0",
     "puppeteer-core": "^25.12.0",
     "qrcode-terminal": "^0.12.0",

@@ -82,17 +82,16 @@ export default {
 									await m.reply('❌ Gagal mengunduh halaman.');
 									return;
 								}
-								// kirim per 8 halaman sebagai album
-								for (let i = 0; i < bufs.length; i += 8) {
-									const chunk = bufs.slice(i, i + 8);
-									const files = chunk.map((b, j) => {
-										const fp = `/tmp/mh_${Date.now()}_${i + j}.jpg`;
-										fs.writeFileSync(fp, b);
-										return fp;
-									});
-									await sendAlbum(hisoka, m.from, files);
-									for (const f of files) { try { fs.unlinkSync(f); } catch {} }
-								}
+								// Jadikan SATU PDF biar nggak spam banyak pesan gambar.
+								await m.reply('📕 Menyusun PDF...');
+								const { imagesToPdf, safePdfName } = await import('../helper/comicpdf.js');
+								const pdf = await imagesToPdf(bufs, { title: `${manga.title} ch.${chNum}` });
+								await hisoka.sendMessage(m.from, {
+									document: pdf,
+									mimetype: 'application/pdf',
+									fileName: safePdfName(`${manga.title} ch.${chNum}`),
+									caption: `📕 *${manga.title}* — ch.${chNum} (${bufs.length} hlm)`,
+								}, { quoted: m });
 								await m.reply(`✅ Selesai: *${manga.title}* ch.${chNum} (${bufs.length} hlm)`);
 							} catch (err) {
 								await m.reply('❌ ' + (err?.message || 'Gagal mengambil chapter.'));
